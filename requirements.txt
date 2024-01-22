@@ -1,0 +1,10 @@
+moviepy==1.0.3
+beautifulsoup4==4.12.2
+lxml==5.1.0
+pillow==10.2.0
+moviepy==1.0.3
+requests==2.31.0
+imageio==2.33.1
+imageio-ffmpeg==0.4.9
+urllib3==2.1.0
+#wheel==0.41.2
