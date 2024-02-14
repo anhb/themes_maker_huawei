@@ -4,11 +4,8 @@ class LoadVariables:
 
         """General Variables"""
         self.icon_path = get_config['icon_path']
+        self.icon_not_working_path = get_config['icon_not_working_path']
         self.icon_default_name = get_config['icon_default_name']
-        self.l_icon_style = get_config['icon_style']
-        self.l_icon_size = get_config['icon_size']
-        self.l_icon_brand = get_config['icon_brand']
-        self.l_icon_format = get_config['icon_format']
         self.l_application = get_config['application']
 
         """Applications"""

@@ -163,3 +163,4 @@ cython_debug/
 assets/icons/apps
 conf/conf.bak.json
 *.mp4
+assets/icons/logos_tmp/*

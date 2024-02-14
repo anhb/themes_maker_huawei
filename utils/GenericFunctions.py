@@ -55,14 +55,30 @@ def remove_all(path):
 
 
 # Rename a file or dir
-def rename_file_dir(main_path, old_name, new_name):
-    curr_nm = f"{main_path}/{old_name}"
-    new_nm = f"{main_path}/{new_name}"
+def rename_file_dir(src, dst):
     try:
-        os.rename(curr_nm, new_nm)
-        print(f"Renamed file '{curr_nm}' to '{new_nm}'")
+        os.rename(src, dst)
+        print(f"Renamed file '{src}' to '{dst}'")
     except OSError as error:
         print(f"Error: {error}")
+
+
+# Copy a dir or file
+def copy_dir_or_file(src, dst):
+    # If the destination directory exists, shutil.copytree will fail. So, handle it.
+    if os.path.exists(dst):
+        for item in os.listdir(src):
+            s = os.path.join(src, item)
+            d = os.path.join(dst, item)
+            if os.path.isdir(s):
+                shutil.copytree(s, d, dirs_exist_ok=True)  # For directories, copy recursively
+                print(f"Dir copied from: '{s}' to '{d}'")
+            else:
+                shutil.copy2(s, d)  # For files, use copy2 to preserve metadata
+                print(f"File copied from: '{s}' to '{d}'")
+    else:
+        # If the destination directory does not exist, use copytree normally
+        shutil.copytree(src, dst, dirs_exist_ok=True)
 
 
 # Verify if a dir or file exists
@@ -87,27 +103,33 @@ def list_all_content_from_path(path):
             print("File:", os.path.join(root, file_name))
 
 
+def list_dirs(path):
+    # List all entries in the directory given by "path"
+    entries = os.listdir(path)
+
+    # Use list comprehension to filter out directories
+    directories = [entry for entry in entries if os.path.isdir(os.path.join(path, entry))]
+
+    return directories
+
+
 """ Icon Donwload """
 
 
-def get_icon_logo_from_playstore(icon_name, path_write):
-    url = f"https://play.google.com/store/apps/details?id={icon_name}"
-    print(url)
+def download_icon_logo_from_playstore(package_name, path_write, name_logo):
+    url = f"https://play.google.com/store/apps/details?id={package_name}"
     response = requests.get(url)
-    print(response)
     soup = BeautifulSoup(response.content, 'lxml')
-    print(soup)
     img_tag = soup.find('img', {'class': 'T75of cN0oRe fFmL2e'})
-    print(img_tag)
 
     if img_tag and 'src' in img_tag.attrs:
         logo_url = img_tag['src']
         print(f"Logo URL: {logo_url}")
         # Optionally download the image
         img_response = requests.get(logo_url)
-        with open(f"{path_write}/app_logo.png", 'wb') as file:
+        with open(f"{path_write}/{name_logo}", 'wb') as file:
             file.write(img_response.content)
-        print(f"Logo downloaded in {path_write}")
+        print(f"Logo downloaded in {path_write}/{name_logo}")
     else:
         print("Logo not found.")
 
@@ -116,12 +138,11 @@ def get_icon_logo_from_playstore(icon_name, path_write):
 
 
 def get_image_size(image_path):
+    path_parts = image_path.split(os.path.sep)
     with Image.open(image_path) as img:
+        if len(path_parts) >= 3:  # Ensure the path is long enough
+            print(f"{path_parts[-2]}: {img.size[0]}x{img.size[1]} (width x height)")
         return img.size
-
-
-def print_image_size(app_name, image_size):
-    print(f"{app_name}: {image_size[0]}x{image_size[1]} (width x height)")
 
 
 def resize_image(image_path, new_size):
@@ -132,8 +153,9 @@ def resize_image(image_path, new_size):
 def crop_to_shape(image_path, output_path, shape):
     with Image.open(image_path) as img:
         # Resize to a square based on the shortest side to maintain aspect ratio
-        side_length = min(img.size)
-        img = img.resize((side_length, side_length), Image.Resampling.LANCZOS)
+        img_rgb = img.convert('RGBA')
+        side_length = min(img_rgb.size)
+        img = img_rgb.resize((side_length, side_length), Image.Resampling.LANCZOS)
         # Create a mask
         mask = Image.new('L', (side_length, side_length), 0)
         draw = ImageDraw.Draw(mask)
@@ -142,7 +164,7 @@ def crop_to_shape(image_path, output_path, shape):
             draw.ellipse([(0, 0), (side_length, side_length)], fill=255)
 
         elif shape == 'hexagon':
-            # Coordinates for a heptagon
+            # Coordinates for a hexagon
             coords = [(
                 side_length * 0.5 + side_length * 0.5 * math.cos(2 * math.pi * i / 6),
                 side_length * 0.5 + side_length * 0.5 * math.sin(2 * math.pi * i / 6)
@@ -150,7 +172,7 @@ def crop_to_shape(image_path, output_path, shape):
             draw.polygon(coords, fill=255)
 
         elif shape == 'octagon':
-            # Coordinates for a heptagon
+            # Coordinates for a octagon
             coords = [(
                 side_length * 0.5 + side_length * 0.5 * math.cos(2 * math.pi * i / 8),
                 side_length * 0.5 + side_length * 0.5 * math.sin(2 * math.pi * i / 8)
@@ -177,9 +199,9 @@ def check_image_mode(image_path):
         return img.mode
 
 
-def extract_colors(image_path, max_colors=10):
+def extract_all_colors(image_path):
     with Image.open(image_path) as img:
-        img = img.convert('RGBA')  # Ensure image is in RGB format
+        img = img.convert('RGB')  # Ensure image is in RGB format
         colors = img.getcolors(maxcolors=1024 * 1024)  # Get colors from the image
 
         # If the image has too many colors, this might return None
@@ -189,6 +211,122 @@ def extract_colors(image_path, max_colors=10):
 
         # Count and sort the colors
         counter = Counter({color: count for count, color in colors})
-        most_common = counter.most_common(max_colors)
+        return counter
 
-        return most_common
+
+def black_and_white(input_image_path, output_image_path):
+    color_image = Image.open(input_image_path)
+    bw = color_image.convert('L')
+    bw.save(output_image_path)
+
+
+def black_and_white_dithering(input_image_path, output_image_path, dithering=True):
+    color_image = Image.open(input_image_path)
+    if dithering:
+        bw = color_image.convert('1')
+    else:
+        bw = color_image.convert('1', dither=Image.NONE)
+    bw.save(output_image_path)
+
+
+def divided_range(divisions, start=0, end=255):
+    range_size = end - start
+    segment_size = range_size / divisions
+
+    segments = []
+    for i in range(divisions):
+        segment_start = start + i * segment_size
+        segment_end = segment_start + segment_size
+        if i == divisions - 1:  # Ensure the last segment ends at the 'end'
+            segment_end = end
+        segments.append((segment_start, segment_end))
+
+    return segments
+
+
+def categorized_custom_num_color(segment_start, segment_end, index, rgb):
+    r, g, b = rgb
+    if r == g == b:  # Ensure it's a grayscale color
+        if r >= segment_start and r <= segment_end:
+            color = f"color_{index}"
+            # print(f"{color}: {rgb}")
+            return color
+        else:
+            return None
+
+
+def get_custom_categorized_ex_colors(extracted_colors, num_colors_to_extract):
+    # Segment ranges by the number of colors to extract
+    segments = divided_range(num_colors_to_extract)
+
+    categorized_colors = {}
+    for rgb in extracted_colors.keys():
+        for i, (start, end) in enumerate(segments):
+            tmp = categorized_custom_num_color(start, end, i, rgb)
+            if tmp != None:
+                categorized_colors.update({rgb: tmp})
+
+    return categorized_colors
+
+
+def replace_custom_colors(image_path, output_path, new_colors, extracted_custom_colors):
+    with Image.open(image_path) as img:
+        img = img.convert("RGB")
+        pixels = img.load()
+
+        for i in range(img.width):
+            for j in range(img.height):
+                category = extracted_custom_colors[pixels[i,j]]
+                new_color = new_colors[category]
+                pixels[i,j] = new_color
+
+        img.save(output_path)
+
+
+def print_segment_ranges(segments):
+    for i, (start, end) in enumerate(segments):
+        print(f"Segment {i + 1}: Start = {start}, End = {end}")
+
+
+def categorize_color(rgb):
+    r, g, b = rgb
+    if r == g == b:
+        return "Gray"
+    elif r < 10 and g < 10 and b < 10:
+        return "Black"
+    elif r > 245 and g > 245 and b > 245:
+        return "White"
+    else:
+        return "Other"
+
+
+def categorize_grayscale_color(rgb):
+    r, g, b = rgb
+    if r == g == b:  # Ensure it's a grayscale color
+        if r <= 50:  # Low values are black 50
+            return "Black"
+        elif r >= 220:  # High values are white 220
+            return "White"
+        else:
+            return "Gray"
+    else:
+        return "Not Grayscale"
+
+
+def replace_colors(image_path, output_path, black_replace, white_replace, gray_replace):
+    with Image.open(image_path) as img:
+        img = img.convert("RGB")
+        pixels = img.load()
+
+        for i in range(img.width):
+            for j in range(img.height):
+                category = categorize_grayscale_color(pixels[i, j])
+                if category == "Black":
+                    pixels[i, j] = black_replace
+                elif category == "White":
+                    pixels[i, j] = white_replace
+                elif category == "Gray":
+                    pixels[i, j] = gray_replace
+
+        img.save(output_path)
+
